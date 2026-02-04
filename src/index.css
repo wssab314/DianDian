@@ -4,21 +4,55 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Space Black #0A0A0B / HSL(240, 5%, 4%) */
+    --background: 240 5% 4%;
+    --foreground: 0 0% 100%;
+
+    /* Surface Dark #141415 / HSL(240, 3%, 8%) */
+    --card: 240 3% 8%;
+    --card-foreground: 0 0% 100%;
+
+    --popover: 240 3% 8%;
+    --popover-foreground: 0 0% 100%;
+
+    /* AI Purple #8B5CF6 / HSL(258, 90%, 66%) */
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Nebula Blue #3B82F6 / HSL(217, 91%, 60%) */
+    --secondary: 217 91% 60%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 3% 18%;
+    /* Slightly lighter than surface */
+    --muted-foreground: 240 5% 65%;
+
+    --accent: 258 90% 66%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3% 18%;
+    --input: 240 3% 18%;
+    --ring: 258 90% 66%;
+
+    --radius: 0.75rem;
   }
- 
+
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 5% 4%;
+    --foreground: 0 0% 100%;
+    /* ... reuse root since we are dark-first design */
   }
 }
- 
+
 @layer base {
   * {
-    @apply border-gray-200;
+    @apply border-border;
   }
+
   body {
-    @apply bg-neutral-900 text-neutral-100; /* Default dark mode base */
+    @apply bg-background text-foreground font-sans antialiased selection:bg-primary/20 selection:text-primary;
   }
 }
