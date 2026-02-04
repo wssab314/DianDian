@@ -54,9 +54,9 @@ class QwenExecutor:
         请严格输出如下JSON格式:
         {{
             "thought": "你的思考过程",
-            "action": "click" | "type" | "scroll" | "navigate" | "done" | "fail",
-            "param": "ID(数字) 或 输入内容(字符串) 或 URL",
-            "target_id": 12 (如果是点击或输入，必须提供SoM ID)
+            "action": "click" | "type" | "scroll" | "navigate" | "back" | "hover" | "done" | "fail",
+            "param": "ID(数字) 或 输入内容(字符串) 或 URL 或 scroll方向('up'/'down')",
+            "target_id": 12 (如果是点击、输入或悬停，必须提供SoM ID)
         }}
         """
 

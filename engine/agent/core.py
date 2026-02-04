@@ -118,6 +118,35 @@ class DiandianAgent:
                                     print(f"[Agent] Type Error: Marker {tid} not found")
                             except Exception as e:
                                 print(f"[Agent] Type failed: {e}")
+                    elif action == "scroll":
+                        try:
+                            # param can be "up", "down", or None
+                            direction = param if param in ["up", "down"] else "down"
+                            if direction == "down":
+                                await self.browser.page.evaluate("window.scrollBy(0, 500)")
+                            else:
+                                await self.browser.page.evaluate("window.scrollBy(0, -500)")
+                            success = True
+                        except Exception as e:
+                            print(f"[Agent] Scroll failed: {e}")
+                    elif action == "back":
+                        try:
+                            await self.browser.page.go_back()
+                            success = True
+                        except Exception as e:
+                            print(f"[Agent] Back failed: {e}")
+                    elif action == "hover":
+                        if target_id is not None:
+                            try:
+                                tid = int(target_id)
+                                if tid in markers:
+                                    await markers[tid].hover()
+                                    success = True
+                                else:
+                                    print(f"Marker {tid} not found for hover")
+                            except Exception as e:
+                                print(f"[Agent] Hover failed: {e}")
+
                     elif action == "done":
                         success = True
                         break 
@@ -138,7 +167,7 @@ class DiandianAgent:
                     self.history.append({"step": step, "action": action, "success": success})
 
                     if success:
-                        break 
+                        break  
                     else:
                         print(f"Action failed, retrying ({attempt+1}/{max_retries})...")
                         await asyncio.sleep(2)
