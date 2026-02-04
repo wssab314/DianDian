@@ -51,7 +51,7 @@ class BrowserController:
         
         try:
             # Quality 50 for performance during streaming
-            screenshot_bytes = await self.page.screenshot(format="jpeg", quality=50)
+            screenshot_bytes = await self.page.screenshot(type="jpeg", quality=50)
             return base64.b64encode(screenshot_bytes).decode("utf-8")
         except Exception as e:
             print(f"Screenshot failed: {e}")
