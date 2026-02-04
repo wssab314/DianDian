@@ -1,0 +1,53 @@
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Node.js / Electron
+node_modules/
+dist/
+build/
+release/
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# PyInstaller
+*.manifest
+*.spec
+build/
+dist/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# DianDian Specific
+/resources/extra/
+/config.json
+/dian_engine/
+*.log
