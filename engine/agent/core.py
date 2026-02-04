@@ -4,40 +4,39 @@ from browser.driver import BrowserController
 from agent.planner import QwenPlanner
 from agent.executor import QwenExecutor
 from agent.som import SetOfMark
+from reporter import Reporter
 
 class DiandianAgent:
-    def __init__(self, browser: BrowserController):
-        self.browser = browser
+    def __init__(self):
         self.planner = QwenPlanner()
         self.executor = QwenExecutor()
-        self.som = SetOfMark(browser.page) # Note: page might be None initially, need handling
-        
+        self.browser = BrowserController()
+        self.som = SetOfMark(None)
         self.history = []
+        self.reporter = None # initialized per task
 
     async def process_command(self, user_input: str, emit_func=None):
-        """
-        Full Agent Loop: Plan -> Execute -> Verify
-        """
-        # 1. Update SoM page reference just in case page changed
-        if self.browser.page:
-            self.som.page = self.browser.page
+        print(f"\n[Agent] Processing: {user_input}")
+        self.history = [] # Reset history for new task
+        self.reporter = Reporter()
+        self.reporter.set_task(user_input)
+
+        # 1. Start Browser if needed
+        await self.browser.start()
+        self.som.page = self.browser.page
 
         # 2. Planning Phase
-        plan_result = await self.planner.plan_task(user_input)
-        steps = plan_result.get("steps", [])
+        if emit_func:
+            await emit_func('agent_thought', {'step': 'planning', 'detail': 'Analyzing request...'})
+        
+        plan = await self.planner.plan_task(user_input)
+        steps = plan.get("steps", [])
         
         if emit_func:
-            formatted_steps = "\n".join([f"- {s}" for s in steps])
-            await emit_func('agent_thought', {'step': 'planning', 'detail': f'Plan:\n{formatted_steps}'})
+            await emit_func('agent_thought', {'step': 'planning', 'detail': f'Plan created: {len(steps)} steps'})
 
         if not steps:
             return {"error": "Failed to generate plan"}
-
-        # Ensure browser is running before execution
-        if not self.browser.page:
-            print("[Agent] Browser not running, starting it now...")
-            await self.browser.start(headless=False)
-            self.som.page = self.browser.page
 
         # 3. Execution Phase
         try:
@@ -164,15 +163,37 @@ class DiandianAgent:
                         if emit_func and post_screenshot:
                              await emit_func('browser_snapshot', {'image': post_screenshot})
 
-                    self.history.append({"step": step, "action": action, "success": success})
-
                     if success:
-                        break  
+                        break
                     else:
                         print(f"Action failed, retrying ({attempt+1}/{max_retries})...")
                         await asyncio.sleep(2)
+            
+            # --- Log Step to Reporter ---
+            # Use the last captured action data
+            if 'action_data' in locals():
+                self.reporter.log_step(
+                   step_name=step,
+                   thought=action_data.get("thought", ""),
+                   action=action_data.get("action", ""),
+                   param=str(action_data.get("param", "") or action_data.get("target_id", "")),
+                   status=success,
+                   screenshot_before=screenshot, # The one with markers
+                   screenshot_after=post_screenshot if success else None
+                )
+
+            # Generate Report
+            report_path = self.reporter.finish(status="completed")
+            if report_path and emit_func:
+                await emit_func('report_generated', {'path': report_path})
+            
         except asyncio.CancelledError:
             print("[Agent] Task Cancelled")
+            self.reporter.finish(status="cancelled")
+            raise
+        except Exception as e:
+            print(f"[Agent] Execution Error: {e}")
+            self.reporter.finish(status="error")
             raise
         finally:
             # Ensure markers are cleared if cancelled/finished

@@ -14,8 +14,8 @@ app = FastAPI()
 socket_app = socketio.ASGIApp(sio, app)
 
 # Global Components
-browser = BrowserController()
-agent = DiandianAgent(browser)
+# Global Components
+agent = DiandianAgent()
 
 @app.get("/")
 def read_root():
