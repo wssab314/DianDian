@@ -20,8 +20,8 @@ class BrowserController:
         # Launch Chromium (can be configured)
         self.browser = await self.playwright.chromium.launch(headless=headless)
         self.context = await self.browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) DianDian/0.1.0"
+            viewport={"width": 1280, "height": 800}
+            # user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) DianDian/0.1.0" # Removed to avoid detection
         )
         self.page = await self.context.new_page()
         self._is_running = True

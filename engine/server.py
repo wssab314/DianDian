@@ -21,10 +21,19 @@ agent = DiandianAgent(browser)
 def read_root():
     return {"message": "DianDian Python Engine is Running"}
 
+# Task Management
+current_task = None
+
 @sio.event
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
     await sio.emit('message', {'data': 'Connected to Python Engine'})
+    # Reset state on new connection? Or sync?
+    # For now assume single user
+    if current_task and not current_task.done():
+        await sio.emit('processing_state', {'status': 'running'})
+    else:
+        await sio.emit('processing_state', {'status': 'idle'})
 
 @sio.event
 async def disconnect(sid):
@@ -32,17 +41,49 @@ async def disconnect(sid):
 
 @sio.event
 async def message(sid, data):
+    global current_task
     print(f"Received message from {sid}: {data}")
     
+    # Check if busy
+    if current_task and not current_task.done():
+        await sio.emit('response', {'data': "⚠️ Agent is busy. Please stop current task first."}, room=sid)
+        return
+
     # Define a helper to emit back to this specific client
     async def emit_to_client(event, payload):
         await sio.emit(event, payload, room=sid)
 
-    # Hand off to Agent
+    async def handle_agent_task(text, sid):
+         global current_task
+         try:
+             await sio.emit('processing_state', {'status': 'running'}, room=sid)
+             await agent.process_command(text, emit_func=emit_to_client)
+             await sio.emit('response', {'data': f"Agent finished: {text}"}, room=sid)
+         except asyncio.CancelledError:
+             print("Agent task cancelled")
+             await sio.emit('response', {'data': "🛑 Task stopped by user."}, room=sid)
+         except Exception as e:
+             print(f"Agent Task Error: {e}")
+             await sio.emit('response', {'data': f"Error: {str(e)}"}, room=sid)
+         finally:
+             current_task = None
+             await sio.emit('processing_state', {'status': 'idle'}, room=sid)
+
+    # Hand off to Agent (Non-blocking)
     user_text = data.get('data', '')
     if user_text:
-        await agent.process_command(user_text, emit_func=emit_to_client)
-        await sio.emit('response', {'data': f"Agent processed: {user_text}"})
+        # Fire and forget (or track mechanism if needed)
+        current_task = asyncio.create_task(handle_agent_task(user_text, sid))
+
+@sio.event
+async def stop(sid, data):
+    global current_task
+    print(f"Received STOP command from {sid}")
+    if current_task and not current_task.done():
+        current_task.cancel()
+        await sio.emit('response', {'data': "Stopping agent..."}, room=sid)
+    else:
+         await sio.emit('response', {'data': "No active task to stop."}, room=sid)
 
 
 # --- Browser Control Events (Legacy/Direct) ---
