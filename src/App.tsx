@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from 'react'
-// import io from 'socket.io-client' // 暂时先注释，等 npm install 后再启用
+import io from 'socket.io-client'
 
 function App() {
     const [status, setStatus] = useState('初始化中...')
 
     useEffect(() => {
-        // const socket = io('http://localhost:8000')
-        // socket.on('connect', () => {
-        //   setStatus('已连接 Python 引擎 🟢')
-        // })
-        // socket.on('disconnect', () => {
-        //   setStatus('Python 引擎断开 🔴')
-        // })
-        // return () => {
-        //   socket.disconnect()
-        // }
-        setStatus('等待依赖安装... (Socket.IO client not installed yet)')
+        const socket = io('http://localhost:8000')
+        socket.on('connect', () => {
+            setStatus('已连接 Python 引擎 🟢')
+        })
+        socket.on('disconnect', () => {
+            setStatus('Python 引擎断开 🔴')
+        })
+
+        // Test event
+        socket.emit('message', { data: 'Hello from React' })
+
+        return () => {
+            socket.disconnect()
+        }
     }, [])
 
     return (
