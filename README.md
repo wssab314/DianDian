@@ -45,9 +45,9 @@ graph TD
     subgraph "Backend Engine (Python)"
         Backend[⚡ FastAPI Server] 
         Orchestrator[🧠 Agent 编排器]
-        Planner[📝 任务规划 (Qwen-Max)]
-        Executor[👁️ 视觉执行 (Qwen-VL)]
-        Driver[🏎️ Playwright Driver]
+        Planner["📝 任务规划 (Qwen-Max)"]
+        Executor["👁️ 视觉执行 (Qwen-VL)"]
+        Driver["🏎️ Playwright Driver"]
     end
     
     Driver -- 操作/截图 --> Browser[🌐 目标网页]
