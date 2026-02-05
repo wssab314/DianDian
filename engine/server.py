@@ -130,7 +130,20 @@ async def message(sid, data):
         current_task = asyncio.create_task(handle_agent_task(user_text, sid))
 
 @sio.event
+async def interact(sid, data):
+    """
+    Handle Point & Teach interaction from frontend.
+    data: { x: float, y: float }
+    """
+    x = data.get("x")
+    y = data.get("y")
+    if x is not None and y is not None:
+        await agent.handle_interaction(x, y)
+        await sio.emit('response', {'data': "👆 Target Locked. Agent updated."}, room=sid)
+
+@sio.event
 async def stop(sid, data):
+    # ... (existing stop handler)
     global current_task
     print(f"Received STOP command from {sid}")
     if current_task and not current_task.done():

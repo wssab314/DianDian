@@ -1,68 +1,68 @@
 # DianDian (点点) 🤖
 
 > **Turning Toys into Tools.**
-> A natural language driven, hybrid-perception web automation agent.
+> 一个自然语言驱动、混合感知的网页自动化代理。
 
-**Current Version:** v1.1 (In Development)
-**Status:** 🚧 Iterating
+**当前版本:** v1.1 (开发中)
+**状态:** 🚧 迭代中
 
-## 🌟 What is DianDian?
+## 🌟 什么是点点?
 
-DianDian is an intelligent browser agent that "sees" web pages like a human and "reads" code like a machine. It converts your natural language instructions (e.g., "Go to Amazon and buy a black keyboard") into actual browser actions.
+点点是一个智能浏览器代理，它像人类一样"看"网页，像机器一样"读"代码。它将你的自然语言指令（例如："去亚马逊买个黑色键盘"）转化为实际的浏览器操作。
 
-In **v1.1**, we are introducing a **Hybrid Perception Engine** that combines the speed of DOM-based text analysis (L1) with the robustness of visual understanding (L2), significantly reducing cost and latency while enabling **Test Case Recording & Replay**.
+在 **v1.1** 中，我们引入了 **混合感知引擎 (Hybrid Perception Engine)**，结合了 DOM 文本分析 (L1) 的速度和视觉理解 (L2) 的鲁棒性，显着降低了成本和延迟，同时支持 **测试用例录制与回放**。
 
-## ✨ Key Features (v1.1)
+## ✨ 核心特性 (v1.1)
 
-- **🧠 Hybrid Perception Engine**:
-  - **L1 (Fast-Path)**: Uses `Aria Snapshot` + `Qwen-Max` for sub-2s response time on standard UI.
-  - **L2 (Robust-Path)**: Fallback to `Screenshot` + `SoM` + `Qwen-VL-Max` for complex visual tasks.
-- **📼 Record & Replay**: Save your conversation as a reusable Test Case. Build your regression suite simply by chatting.
-- **👆 Point & Teach**: AI stuck? Just click the element on the screen to teach it correct selector.
-- **📱 Mobile Emulation**: Test H5 pages by simulating iPhone/Android viewports.
-- **📊 Local Reporting**: Auto-generated HTML reports with screenshots and step-by-step logs.
+- **🧠 混合感知引擎**:
+  - **L1 (极速模式)**: 使用 `Aria Snapshot` + `Qwen-Max`，对标准 UI 实现秒级响应。
+  - **L2 (视觉兜底)**: 使用 `Screenshot` + `SoM` + `Qwen-VL-Max` 处理复杂视觉任务。
+- **📼 录制与回放**: 将对话保存为可复用的测试用例。只需聊天即可构建回归测试套件。
+- **👆 点选教学 (Point & Teach)**: AI 卡住了？只需点击屏幕上的元素，即可教它正确的选择器。
+- **📱 移动端模拟**: 模拟 iPhone/Android 设备视口，测试 H5 页面。
+- **📊 本地报告**: 自动生成包含截图和步骤日志的 HTML 报告。
 
-## 🛠️ Tech Stack
+## 🛠️ 技术栈
 
-- **Frontend**: Electron + React + TailwindCSS + Radix UI
-- **Backend**: Python (FastAPI + Socket.IO)
-- **AI Core**: Qwen-Max (Logic/Text) + Qwen-VL-Max (Vision)
-- **Automation**: Playwright (w/ Aria Snapshot)
-- **Database**: SQLite + SQLModel
+- **前端**: Electron + React + TailwindCSS + Radix UI
+- **后端**: Python (FastAPI + Socket.IO)
+- **AI 核心**: Qwen-Max (逻辑/文本) + Qwen-VL-Max (视觉)
+- **自动化**: Playwright (w/ Aria Snapshot)
+- **数据库**: SQLite + SQLModel
 
-## 🚀 Getting Started
+## 🚀 快速开始
 
-### Prerequisites
+### 前置要求
 - Node.js > 18
 - Python > 3.10
 - DashScope API Key (Qwen Models)
 
-### Installation
+### 安装
 
 ```bash
-# 1. Clone Repo
+# 1. 克隆仓库
 git clone https://github.com/your-repo/diandian.git
 
-# 2. Frontend Setup
+# 2. 前端设置
 npm install
 
-# 3. Backend Setup
+# 3. 后端设置
 cd engine
 pip install -r requirements.txt
 ```
 
-### Running
+### 运行
 
 ```bash
-# Terminal 1: Start Backend & Frontend
+# 终端 1: 启动后端和前端
 npm run dev
 ```
 
-## 🗺️ Roadmap
+## 🗺️ 路线图
 
-- [x] **v1.0 MVP**: Visual-only Agent, Basic Chat, Browser Control.
-- [ ] **v1.1 Stability**: Hybrid Engine, SQLite Persistence, Case Library.
-- [ ] **v1.2 Scale**: Cloud Execution, CI/CD Integration, Docker Support.
+- [x] **v1.0 MVP**: 纯视觉代理，基础聊天，浏览器控制。
+- [x] **v1.1 Stability**: 混合引擎，SQLite 持久化，用例库。
+- [ ] **v1.2 Scale**: 云端执行，CI/CD 集成，Docker 支持。
 
 ---
 *Built with ❤️ by Aibu*

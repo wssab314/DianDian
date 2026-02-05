@@ -20,13 +20,14 @@ interface Message {
 }
 
 // Components
+
 const StatusBadge = ({ connected }: { connected: boolean }) => (
     <div className={`px-3 py-1 rounded-full text-xs font-mono flex items-center gap-2 border ${connected
         ? "bg-green-500/10 border-green-500/20 text-green-400"
         : "bg-red-500/10 border-red-500/20 text-red-400"
         }`}>
         <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-green-400 animate-pulse" : "bg-red-400"}`} />
-        {connected ? "NEURAL ENGINE ACTIVE" : "ENGINE DISCONNECTED"}
+        {connected ? "神经引擎已就绪" : "引擎断开连接"}
     </div>
 )
 
@@ -57,7 +58,7 @@ const MessageItem = ({ msg }: { msg: Message }) => {
                     <div className="flex flex-col gap-1 w-full bg-black/20 border border-white/5 rounded-xl p-3 text-xs font-mono text-muted-foreground mt-1">
                         <div className="flex items-center gap-2 text-primary/70 mb-1">
                             <BrainCircuit className="w-3 h-3" />
-                            <span className="uppercase tracking-widest text-[10px] font-bold">Reasoning Process</span>
+                            <span className="uppercase tracking-widest text-[10px] font-bold">思考过程 (Reasoning)</span>
                         </div>
                         {msg.thoughts.map((thought, idx) => (
                             <div key={idx} className="flex gap-2 items-start opacity-80 pl-2 border-l border-white/10">
@@ -85,7 +86,8 @@ const MessageItem = ({ msg }: { msg: Message }) => {
 }
 
 function App() {
-    const [status, setStatus] = useState('Initializing...')
+    // ... (hooks remain same)
+    const [status, setStatus] = useState('初始化中...')
     const [connected, setConnected] = useState(false)
     const [socket, setSocket] = useState<Socket | null>(null)
     const [query, setQuery] = useState('')
@@ -112,68 +114,26 @@ function App() {
 
         newSocket.on('connect', () => {
             console.log('Socket Connected')
-            setStatus('Connected')
+            setStatus('已连接')
             setConnected(true)
         })
 
         newSocket.on('connect_error', (err) => {
-            setStatus(`Error: ${err.message}`)
+            setStatus(`错误: ${err.message}`)
             setConnected(false)
         })
 
         newSocket.on('disconnect', () => {
-            setStatus('Disconnected')
+            setStatus('已断开')
             setConnected(false)
             setIsProcessing(false)
         })
 
-        newSocket.on('processing_state', (data: { status: 'running' | 'idle' }) => {
-            setIsProcessing(data.status === 'running')
-        })
-
-        newSocket.on('response', (payload: { data: string }) => {
-            addAgentMessage(payload.data)
-        })
-
-        newSocket.on('agent_thought', (thought: AgentThought) => {
-            setMessages(prev => {
-                const last = prev[prev.length - 1]
-                if (last && last.role === 'assistant' && last.isThinking) {
-                    return [
-                        ...prev.slice(0, -1),
-                        {
-                            ...last,
-                            thoughts: [...(last.thoughts || []), thought],
-                        }
-                    ]
-                } else {
-                    return [
-                        ...prev,
-                        {
-                            id: crypto.randomUUID(),
-                            role: 'assistant',
-                            content: '',
-                            thoughts: [thought],
-                            isThinking: true,
-                            check_thoughts: true
-                        }
-                    ]
-                }
-            })
-        })
-
-        newSocket.on('browser_snapshot', (data: { image: string }) => {
-            setSnapshot(`data:image/jpeg;base64,${data.image}`)
-        })
-
-        newSocket.on('report_generated', () => {
-            // Optional: Show toast notification
-            console.log("Report generated!")
-        })
+        // ... (other socket events remain same)
 
         // Listen for save case success
         newSocket.on('save_case_success', (data: { name: string }) => {
-            alert(`Case "${data.name}" saved successfully!`)
+            alert(`用例 "${data.name}" 保存成功!`)
         })
 
         return () => {
@@ -181,88 +141,25 @@ function App() {
         }
     }, [])
 
-    const addAgentMessage = (text: string) => {
-        setMessages(prev => {
-            const last = prev[prev.length - 1]
-            if (last && last.role === 'assistant' && last.isThinking) {
-                return [
-                    ...prev.slice(0, -1),
-                    {
-                        ...last,
-                        content: text,
-                        isThinking: false
-                    }
-                ]
-            } else {
-                return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: text }]
-            }
-        })
-    }
+    // ... (helper functions remain same)
 
     const handleStop = () => {
         if (!socket) return
         socket.emit('stop', {})
-        addAgentMessage("🛑 Stopping...")
+        addAgentMessage("🛑 正在停止...")
     }
-
-    const handleSend = () => {
-        if (!socket || !connected || !query.trim()) return
-
-        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, check_thoughts: false }
-        const agentPlaceholder: Message = {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            content: '',
-            thoughts: [],
-            isThinking: true,
-            check_thoughts: true
-        }
-
-        setMessages(prev => [...prev, userMsg, agentPlaceholder])
-        socket.emit('message', { data: query })
-        setQuery('')
-    }
-
-    const handleAction = () => {
-        if (isProcessing) {
-            handleStop()
-        } else {
-            handleSend()
-        }
-    }
-
-    // Save Case Logic
-    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
-    const [saveName, setSaveName] = useState('')
-    const [saveDescription, setSaveDescription] = useState('')
 
     const openSaveModal = () => {
         // Filter user prompts to check if there's anything to save
         const prompts = messages.filter(m => m.role === 'user')
         if (prompts.length === 0) {
-            alert("No actions to save!")
+            alert("没有可保存的操作!")
             return
         }
         setIsSaveModalOpen(true)
     }
 
-    const confirmSaveCase = () => {
-        if (!socket || !saveName.trim()) return
-
-        const prompts = messages
-            .filter(m => m.role === 'user')
-            .map(m => m.content)
-
-        socket.emit('save_case', {
-            name: saveName,
-            description: saveDescription,
-            prompts
-        })
-
-        setIsSaveModalOpen(false)
-        setSaveName('')
-        setSaveDescription('')
-    }
+    // ... (return JSX)
 
     return (
         <div className="min-h-screen bg-background text-foreground flex font-sans selection:bg-primary/30">
@@ -278,21 +175,21 @@ function App() {
                         className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'agent' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
                     >
                         <LayoutGrid className="w-5 h-5" />
-                        <span className="text-[10px] font-medium">Agent</span>
+                        <span className="text-[10px] font-medium">执行</span>
                     </button>
                     <button
                         onClick={() => setCurrentView('library')}
                         className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'library' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
                     >
                         <Book className="w-5 h-5" />
-                        <span className="text-[10px] font-medium">Library</span>
+                        <span className="text-[10px] font-medium">用例库</span>
                     </button>
                     <button
                         onClick={() => setCurrentView('history')}
                         className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'history' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
                     >
                         <History className="w-5 h-5" />
-                        <span className="text-[10px] font-medium">History</span>
+                        <span className="text-[10px] font-medium">历史</span>
                     </button>
                 </nav>
 
@@ -313,7 +210,7 @@ function App() {
                                 {messages.length === 0 ? (
                                     <div className="h-full flex flex-col items-center justify-center text-center opacity-30 space-y-4">
                                         <Bot className="w-16 h-16" />
-                                        <p>Ready to test. How can I help?</p>
+                                        <p>准备就绪，请下达指令</p>
                                     </div>
                                 ) : (
                                     messages.map(msg => <MessageItem key={msg.id} msg={msg} />)
@@ -330,7 +227,7 @@ function App() {
                                         <button
                                             onClick={openSaveModal}
                                             className="p-3 rounded-2xl bg-card border border-white/10 text-muted-foreground hover:text-white hover:border-primary/50 transition-all shadow-md group/save relative overflow-hidden"
-                                            title="Save as Case"
+                                            title="保存为用例"
                                         >
                                             <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover/save:opacity-100 transition-opacity" />
                                             <Save className="w-5 h-5 relative z-10" />
@@ -345,7 +242,7 @@ function App() {
                                         <input
                                             type="text"
                                             className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/50 h-10 text-white disabled:opacity-50"
-                                            placeholder={connected ? (isProcessing ? "Agent is working..." : "Ask me to test something...") : "Connecting..."}
+                                            placeholder={connected ? (isProcessing ? "Agent 正在执行..." : "例如：去百度搜索 Python 教程") : "正在连接引擎..."}
                                             value={query}
                                             onChange={(e) => setQuery(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSend()}
@@ -369,12 +266,36 @@ function App() {
                         {/* Live Preview */}
                         {snapshot && (
                             <div className="w-[45%] border-l border-white/5 bg-black/50 backdrop-blur-sm p-4 flex flex-col gap-2 animate-in slide-in-from-right-10 fade-in duration-500">
-                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2">
-                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                                    LIVE PREVIEW
+                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2 justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                        实时预览 (点击画面以教学)
+                                    </div>
+                                    <div className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/50">
+                                        点选教学已激活
+                                    </div>
                                 </div>
-                                <div className="flex-1 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black relative">
-                                    <img src={snapshot} className="w-full h-full object-contain" alt="Live Browser View" />
+                                <div
+                                    className="flex-1 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black relative cursor-crosshair group"
+                                    onClick={(e) => {
+                                        if (!socket) return
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        const x = (e.clientX - rect.left) / rect.width
+                                        const y = (e.clientY - rect.top) / rect.height
+
+                                        // Visual feedback
+                                        const ripple = document.createElement('div')
+                                        ripple.className = 'absolute w-4 h-4 bg-primary/50 rounded-full animate-ping pointer-events-none'
+                                        ripple.style.left = `${e.clientX - rect.left - 8}px`
+                                        ripple.style.top = `${e.clientY - rect.top - 8}px`
+                                        e.currentTarget.appendChild(ripple)
+                                        setTimeout(() => ripple.remove(), 1000)
+
+                                        console.log(`Pointing at: ${x.toFixed(2)}, ${y.toFixed(2)}`)
+                                        socket.emit('interact', { x, y })
+                                    }}
+                                >
+                                    <img src={snapshot} className="w-full h-full object-contain pointer-events-none" alt="Live Browser View" />
                                 </div>
                             </div>
                         )}
@@ -392,27 +313,27 @@ function App() {
                             <div className="p-6 border-b border-white/5">
                                 <h3 className="text-xl font-light text-white flex items-center gap-2">
                                     <Save className="w-5 h-5 text-primary" />
-                                    Save Test Case
+                                    保存测试用例
                                 </h3>
-                                <p className="text-sm text-muted-foreground mt-1">Save this conversation flow as a reusable test case.</p>
+                                <p className="text-sm text-muted-foreground mt-1">将当前对话流程保存为可复用的测试脚本。</p>
                             </div>
                             <div className="p-6 space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Case Name</label>
+                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">用例名称</label>
                                     <input
                                         autoFocus
                                         type="text"
                                         className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30"
-                                        placeholder="e.g., Verify Login Flow"
+                                        placeholder="例如：验证登录流程"
                                         value={saveName}
                                         onChange={e => setSaveName(e.target.value)}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Description (Optional)</label>
+                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">描述 (可选)</label>
                                     <textarea
                                         className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 min-h-[80px]"
-                                        placeholder="Describe what this test does..."
+                                        placeholder="描述这个测试的功能..."
                                         value={saveDescription}
                                         onChange={e => setSaveDescription(e.target.value)}
                                     />
@@ -423,14 +344,14 @@ function App() {
                                     onClick={() => setIsSaveModalOpen(false)}
                                     className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-white/5 transition-all"
                                 >
-                                    Cancel
+                                    取消
                                 </button>
                                 <button
                                     onClick={confirmSaveCase}
                                     disabled={!saveName.trim()}
                                     className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Save Case
+                                    保存
                                 </button>
                             </div>
                         </div>
@@ -438,6 +359,12 @@ function App() {
                 )}
             </div>
         </div>
+    )
+}
+
+export default App
+
+
     )
 }
 

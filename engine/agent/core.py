@@ -2,20 +2,89 @@ import asyncio
 import json
 from browser.driver import BrowserController
 from agent.planner import QwenPlanner
-from agent.executor import QwenExecutor
+from agent.executor import HybridExecutor
 from agent.som import SetOfMark
 from reporter import Reporter
 
 class DiandianAgent:
     def __init__(self):
         self.planner = QwenPlanner()
-        self.executor = QwenExecutor()
+        self.executor = HybridExecutor()
         self.browser = BrowserController()
         self.som = SetOfMark(None)
         self.history = []
         self.reporter = None # initialized per task
 
+    async def handle_interaction(self, x: float, y: float):
+        """
+        Phase 3: Point & Teach
+        Convert relative (x, y) to element selector and inject into history.
+        """
+        if not self.browser.page:
+            print("[Agent] Browser not active, ignoring interaction.")
+            return
+
+        print(f"[Agent] Processing Interaction: ({x:.2f}, {y:.2f})")
+        
+        # 1. Execute JS to find element and generate selector
+        function_js = """
+        (x_pct, y_pct) => {
+            const x = x_pct * window.innerWidth;
+            const y = y_pct * window.innerHeight;
+            const el = document.elementFromPoint(x, y);
+            
+            if (!el) return null;
+
+            // Highlight temporarily
+            const originalBoxShadow = el.style.boxShadow;
+            const originalBorder = el.style.border;
+            el.style.border = "2px solid #ef4444"; // Red border
+            el.style.boxShadow = "0 0 10px rgba(239, 68, 68, 0.5)";
+            setTimeout(() => {
+                el.style.border = originalBorder;
+                el.style.boxShadow = originalBoxShadow;
+            }, 1000);
+
+            // Generate Selector Strategy
+            // 1. ID
+            if (el.id) return `#${el.id}`;
+            
+            // 2. Name / Role (Approximation)
+            const role = el.getAttribute('role');
+            const name = el.getAttribute('name') || el.innerText?.slice(0, 10);
+            if (role && name) return `role=${role}[name='${name.trim()}']`;
+            
+            // 3. Fallback: Tag + Class (Simple)
+            let selector = el.tagName.toLowerCase();
+            if (el.className && typeof el.className === 'string') {
+                const cls = el.className.trim().split(/\s+/)[0];
+                if (cls) selector += `.${cls}`;
+            }
+            return selector;
+        }
+        """
+
+        try:
+            selector = await self.browser.page.evaluate(function_js, [x, y])
+            print(f"[Agent] Identified Element: {selector}")
+            
+            if selector:
+                # 2. Inject into History
+                hint = {
+                    "role": "user", 
+                    "content": f"[User Hint] I am pointing at the element '{selector}'. Please interact with it in the next step."
+                }
+                self.history.append(hint)
+                print("[Agent] Hint injected into history.")
+                return selector
+                
+        except Exception as e:
+            print(f"[Agent] Interaction Error: {e}")
+            
+        return None
+
     async def process_command(self, user_input: str, emit_func=None):
+        # ... (rest of the method method)
         print(f"\n[Agent] Processing: {user_input}")
         self.history = [] # Reset history for new task
         self.reporter = Reporter()
@@ -60,6 +129,13 @@ class DiandianAgent:
                     await asyncio.sleep(0.5)
                     screenshot = await self.browser.capture_screenshot()
                     
+                    # Capture Aria Snapshot (L1)
+                    aria_snapshot = ""
+                    try:
+                        aria_snapshot = await self.browser.page.locator("body").aria_snapshot()
+                    except Exception as e:
+                        print(f"[Agent] Aria Snapshot failed: {e}")
+                    
                     if not screenshot:
                          print("[Agent] Failed to capture screenshot. Retrying...")
                          if attempt < max_retries - 1:
@@ -71,26 +147,43 @@ class DiandianAgent:
                          await emit_func('browser_snapshot', {'image': screenshot})
                     
                     history_str = json.dumps(self.history[-3:])
+                    
+                    # Call Hybrid Executor
                     action_data = await self.executor.decide_action(
-                        screenshot, step, user_input, history_str
+                        screenshot_base64=screenshot,
+                        aria_snapshot=aria_snapshot,
+                        current_step=step,
+                        goal=user_input,
+                        history_str=history_str
                     )
                     
                     action = action_data.get("action")
                     target_id = action_data.get("target_id")
+                    selector = action_data.get("selector") # L1 Selector
                     param = action_data.get("param")
                     thought = action_data.get("thought", "")
+                    strategy = action_data.get("strategy", "vision") # text or vision
 
                     param_str = f" {param}" if param is not None else ""
                     target_str = f" #{target_id}" if target_id is not None else ""
+                    selector_str = f" [{selector}]" if selector else ""
                     
                     if emit_func:
-                        await emit_func('agent_thought', {'step': 'action', 'detail': f'{thought} -> {action}{target_str}{param_str}'})
+                        await emit_func('agent_thought', {'step': 'action', 'detail': f'{thought} -> {action}{target_str}{selector_str}{param_str} ({strategy})'})
 
                     success = False
                     if action == "navigate":
                         success = await self.browser.navigate(param or target_id) 
                     elif action == "click":
-                        if target_id is not None:
+                        # L1: Selector
+                        if selector:
+                            try:
+                                await self.browser.page.locator(selector).click(timeout=5000)
+                                success = True
+                            except Exception as e:
+                                print(f"[Agent] L1 Click Failed: {e}")
+                        # L2: Vision ID
+                        elif target_id is not None:
                             try:
                                 tid = int(target_id)
                                 if tid in markers:
@@ -101,7 +194,18 @@ class DiandianAgent:
                             except Exception as e:
                                 print(f"Click failed: {e}")
                     elif action == "type":
-                        if target_id is not None:
+                        # L1: Selector
+                        if selector:
+                            try:
+                                el = self.browser.page.locator(selector)
+                                await el.click()
+                                await el.fill("")
+                                await el.type(str(param), delay=100)
+                                success = True
+                            except Exception as e:
+                                print(f"[Agent] L1 Type Failed: {e}")
+                        # L2: Vision ID
+                        elif target_id is not None:
                             try:
                                 tid = int(target_id)
                                 if tid in markers:
@@ -138,7 +242,14 @@ class DiandianAgent:
                         except Exception as e:
                             print(f"[Agent] Back failed: {e}")
                     elif action == "hover":
-                        if target_id is not None:
+                         # Only support L2 hover for now, or L1 if selector
+                        if selector:
+                            try:
+                                await self.browser.page.locator(selector).hover()
+                                success = True
+                            except Exception as e:
+                                print(f"[Agent] L1 Hover Failed: {e}")
+                        elif target_id is not None:
                             try:
                                 tid = int(target_id)
                                 if tid in markers:

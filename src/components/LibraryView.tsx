@@ -45,9 +45,9 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
             {/* Header */}
             <header className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20 backdrop-blur-md">
                 <div>
-                    <h1 className="text-2xl font-light text-white tracking-wide">Test Case Library</h1>
+                    <h1 className="text-2xl font-light text-white tracking-wide">测试用例库</h1>
                     <p className="text-xs text-muted-foreground mt-1 font-mono">
-                        {cases.length} saved workflows available for replay
+                        {cases.length} 个已保存的工作流可供回放
                     </p>
                 </div>
             </header>
@@ -71,7 +71,7 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                                 <h3 className="font-medium text-lg text-white truncate">{testCase.name}</h3>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2 h-10">
-                                {testCase.description || "No description provided."}
+                                {testCase.description || "无描述信息。"}
                             </p>
                         </div>
 
@@ -82,7 +82,7 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                             </div>
 
                             <div className="p-3 rounded-lg bg-black/40 border border-white/5 text-xs font-mono text-slate-400 space-y-1">
-                                <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Steps</div>
+                                <div className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">步骤 (STEPS)</div>
                                 {testCase.prompts.slice(0, 3).map((prompt, idx) => (
                                     <div key={idx} className="truncate flex gap-2">
                                         <span className="text-primary/50">{idx + 1}.</span>
@@ -91,7 +91,7 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                                 ))}
                                 {testCase.prompts.length > 3 && (
                                     <div className="text-center opacity-50 text-[10px] pt-1">
-                                        +{testCase.prompts.length - 3} more steps
+                                        + 还有 {testCase.prompts.length - 3} 个步骤
                                     </div>
                                 )}
                             </div>
@@ -103,7 +103,7 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                             className="mt-2 w-full py-3 rounded-lg bg-white/5 hover:bg-primary hover:text-white border border-white/10 hover:border-transparent transition-all flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed group-hover:bg-primary/20 group-hover:text-primary"
                         >
                             <Play className="w-4 h-4 fill-current" />
-                            Run Automation
+                            执行自动化
                         </button>
                     </div>
                 ))}
@@ -111,11 +111,13 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                 {cases.length === 0 && !isLoading && (
                     <div className="col-span-full flex flex-col items-center justify-center py-20 text-muted-foreground opacity-50">
                         <FileJson className="w-16 h-16 mb-4 stroke-1" />
-                        <p>No saved test cases yet.</p>
-                        <p className="text-sm">Run a chat session and click "Save as Case" to add one.</p>
+                        <p>暂无保存的用例。</p>
+                        <p className="text-sm">运行一个对话并点击 "保存测试用例" 按钮来创建一个。</p>
                     </div>
                 )}
             </div>
         </div>
     )
 }
+
+
