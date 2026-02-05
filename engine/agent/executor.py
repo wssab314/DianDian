@@ -64,6 +64,7 @@ class QwenExecutor:
         - `click`: 点击元素。需提供 `target_id`。
         - `type`: 输入文本。需提供 `target_id` 和 `param`(文本内容)。
         - `scroll`: 滚动页面。`param` 为 "up" 或 "down"。无需 `target_id`。
+        - `navigate`: 访问URL。`param`为网址。无需 `target_id`。
         - `back`: 浏览器后退。
         - `hover`: 鼠标悬停。需提供 `target_id`。
         - `done`: 任务完成。

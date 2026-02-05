@@ -5,15 +5,26 @@ import sys
 import asyncio
 from browser.driver import BrowserController
 from agent.core import DiandianAgent
+from database import create_db_and_tables
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 app = FastAPI()
 
+# Mount Reports Directory
+REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
+if not os.path.exists(REPORTS_DIR):
+    os.makedirs(REPORTS_DIR)
+app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
+
+# Initialize DB
+@app.on_event("startup")
+def on_startup():
+    create_db_and_tables()
+
 # Wrap with ASGI application
 socket_app = socketio.ASGIApp(sio, app)
 
-# Global Components
 # Global Components
 agent = DiandianAgent()
 

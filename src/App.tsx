@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import io, { Socket } from 'socket.io-client'
-import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square } from 'lucide-react'
+import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square, History, LayoutGrid } from 'lucide-react'
+import HistoryView from './components/HistoryView'
 
 // Types
 interface AgentThought {
@@ -89,9 +90,8 @@ function App() {
     const [query, setQuery] = useState('')
     const [messages, setMessages] = useState<Message[]>([])
     const [snapshot, setSnapshot] = useState<string | null>(null)
-
-    // New: Processing State
     const [isProcessing, setIsProcessing] = useState(false)
+    const [currentView, setCurrentView] = useState<'agent' | 'history'>('agent')
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -126,45 +126,34 @@ function App() {
             setIsProcessing(false)
         })
 
-        // Status update from Server
         newSocket.on('processing_state', (data: { status: 'running' | 'idle' }) => {
             setIsProcessing(data.status === 'running')
         })
 
-        // Incoming Agent Response
         newSocket.on('response', (payload: { data: string }) => {
             addAgentMessage(payload.data)
         })
 
-        // Incoming Agent Thought (Streaming)
         newSocket.on('agent_thought', (thought: AgentThought) => {
             setMessages(prev => {
                 const last = prev[prev.length - 1]
-                // If the last message is from assistant and is "thinking" (or we just treat the last assistant msg as the container)
-                // But usually, we want to attach thoughts to the current active agent turn.
-
-                // Check if we have an active agent message
                 if (last && last.role === 'assistant' && last.isThinking) {
                     return [
                         ...prev.slice(0, -1),
                         {
                             ...last,
                             thoughts: [...(last.thoughts || []), thought],
-                            // Keep content empty or update it? Usually text comes AFTER thoughts or during. 
-                            // For now we treat thoughts as separate updates.
                         }
                     ]
                 } else {
-                    // Should not happen easily if we create a bubble on start, but let's create one if needed
                     return [
                         ...prev,
                         {
                             id: crypto.randomUUID(),
                             role: 'assistant',
-                            content: '', // No text yet, just thoughts
+                            content: '',
                             thoughts: [thought],
                             isThinking: true,
-                            // Hack for TypeScript to recognize this has thoughts
                             check_thoughts: true
                         }
                     ]
@@ -176,6 +165,11 @@ function App() {
             setSnapshot(`data:image/jpeg;base64,${data.image}`)
         })
 
+        newSocket.on('report_generated', () => {
+            // Optional: Show toast notification
+            console.log("Report generated!")
+        })
+
         return () => {
             newSocket.disconnect()
         }
@@ -185,17 +179,15 @@ function App() {
         setMessages(prev => {
             const last = prev[prev.length - 1]
             if (last && last.role === 'assistant' && last.isThinking) {
-                // Update the existing thinking bubble with final text and stop thinking
                 return [
                     ...prev.slice(0, -1),
                     {
                         ...last,
-                        content: text, // Or append? Usually 'response' is the final summary.
+                        content: text,
                         isThinking: false
                     }
                 ]
             } else {
-                // Standalone message
                 return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: text }]
             }
         })
@@ -203,9 +195,7 @@ function App() {
 
     const handleStop = () => {
         if (!socket) return
-        console.log('Stopping agent...')
         socket.emit('stop', {})
-        // Ideally wait for server to say 'idle', but UI feedback is good
         addAgentMessage("🛑 Stopping...")
     }
 
@@ -213,8 +203,6 @@ function App() {
         if (!socket || !connected || !query.trim()) return
 
         const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, check_thoughts: false }
-
-        // Create a placeholder for Agent immediately
         const agentPlaceholder: Message = {
             id: crypto.randomUUID(),
             role: 'assistant',
@@ -224,15 +212,11 @@ function App() {
             check_thoughts: true
         }
 
-        // Combined update to avoid potential race conditions or duplication logic errors
         setMessages(prev => [...prev, userMsg, agentPlaceholder])
-
-        console.log('Sending:', query)
         socket.emit('message', { data: query })
         setQuery('')
     }
 
-    // Submit handler that decides logic
     const handleAction = () => {
         if (isProcessing) {
             handleStop()
@@ -242,88 +226,102 @@ function App() {
     }
 
     return (
-        <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/30">
-            {/* Top Navbar */}
-            <header className="h-14 flex items-center justify-between px-6 border-b border-white/5 bg-background/50 backdrop-blur-md sticky top-0 z-50">
-                <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-purple-700 flex items-center justify-center shadow-lg shadow-primary/20">
-                        <Sparkles className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-bold tracking-tight text-lg bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">DianDian</span>
+        <div className="min-h-screen bg-background text-foreground flex font-sans selection:bg-primary/30">
+            {/* Sidebar Navigation */}
+            <aside className="w-20 border-r border-white/5 bg-background/50 backdrop-blur-md flex flex-col items-center py-6 gap-6">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-700 flex items-center justify-center shadow-lg shadow-primary/20 mb-4">
+                    <Sparkles className="w-5 h-5 text-white" />
                 </div>
-                <StatusBadge connected={connected} />
-            </header>
 
-            {/* Main Content */}
-            <main className="flex-1 flex overflow-hidden">
+                <nav className="flex flex-col gap-4 w-full px-2">
+                    <button
+                        onClick={() => setCurrentView('agent')}
+                        className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'agent' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+                    >
+                        <LayoutGrid className="w-5 h-5" />
+                        <span className="text-[10px] font-medium">Agent</span>
+                    </button>
+                    <button
+                        onClick={() => setCurrentView('history')}
+                        className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'history' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+                    >
+                        <History className="w-5 h-5" />
+                        <span className="text-[10px] font-medium">History</span>
+                    </button>
+                </nav>
 
-                {/* Left: Chat Area */}
-                <div className={`flex-1 flex flex-col relative z-10 w-full transition-all duration-500 ${snapshot ? 'mr-0' : 'mr-0'}`}>
+                <div className="mt-auto">
+                    <StatusBadge connected={connected} />
+                </div>
+            </aside>
 
-                    {/* Messages List */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide">
-                        {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center opacity-30 space-y-4">
-                                <Bot className="w-16 h-16" />
-                                <p>Ready to test. How can I help?</p>
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+                {currentView === 'agent' ? (
+                    <main className="flex-1 flex overflow-hidden">
+                        {/* Chat Area */}
+                        <div className={`flex-1 flex flex-col relative z-10 w-full transition-all duration-500`}>
+                            {/* Messages List */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide">
+                                {messages.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-center opacity-30 space-y-4">
+                                        <Bot className="w-16 h-16" />
+                                        <p>Ready to test. How can I help?</p>
+                                    </div>
+                                ) : (
+                                    messages.map(msg => <MessageItem key={msg.id} msg={msg} />)
+                                )}
+                                <div ref={messagesEndRef} />
                             </div>
-                        ) : (
-                            messages.map(msg => <MessageItem key={msg.id} msg={msg} />)
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
 
-                    {/* Input Area */}
-                    <div className="p-4 bg-background/50 backdrop-blur-sm border-t border-white/5">
-                        <div className="relative group max-w-3xl mx-auto">
-                            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/50 to-blue-500/50 rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-500"></div>
-                            <div className="relative bg-card border border-white/10 rounded-2xl p-2 flex items-center shadow-2xl">
-                                <div className="pl-4 pr-3 text-muted-foreground">
-                                    <Terminal className="w-6 h-6" />
+                            {/* Input Area */}
+                            <div className="p-4 bg-background/50 backdrop-blur-sm border-t border-white/5">
+                                <div className="relative group max-w-3xl mx-auto">
+                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/50 to-blue-500/50 rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-500"></div>
+                                    <div className="relative bg-card border border-white/10 rounded-2xl p-2 flex items-center shadow-2xl">
+                                        <div className="pl-4 pr-3 text-muted-foreground">
+                                            <Terminal className="w-6 h-6" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/50 h-10 text-white disabled:opacity-50"
+                                            placeholder={connected ? (isProcessing ? "Agent is working..." : "Ask me to test something...") : "Connecting..."}
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSend()}
+                                            disabled={!connected || isProcessing}
+                                        />
+                                        <button
+                                            className={`px-3 py-2 rounded-xl font-medium transition-all shadow-lg flex items-center gap-2 ${connected
+                                                ? (isProcessing ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/25" : "bg-primary hover:bg-primary/90 text-white shadow-primary/25")
+                                                : "bg-muted text-muted-foreground cursor-not-allowed"
+                                                }`}
+                                            onClick={handleAction}
+                                            disabled={!connected}
+                                        >
+                                            {isProcessing ? <Square className="w-4 h-4 fill-current" /> : <Rocket className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </div>
-                                <input
-                                    type="text"
-                                    className="flex-1 bg-transparent border-none outline-none text-base placeholder:text-muted-foreground/50 h-10 text-white disabled:opacity-50"
-                                    placeholder={connected ? (isProcessing ? "Agent is working..." : "Ask me to test something...") : "Connecting..."}
-                                    value={query}
-                                    onChange={(e) => setQuery(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSend()}
-                                    disabled={!connected || isProcessing}
-                                />
-                                <button
-                                    className={`px-3 py-2 rounded-xl font-medium transition-all shadow-lg flex items-center gap-2 ${connected
-                                        ? (isProcessing ? "bg-red-500 hover:bg-red-600 text-white shadow-red-500/25" : "bg-primary hover:bg-primary/90 text-white shadow-primary/25")
-                                        : "bg-muted text-muted-foreground cursor-not-allowed"
-                                        }`}
-                                    onClick={handleAction}
-                                    disabled={!connected}
-                                >
-                                    {isProcessing ? <Square className="w-4 h-4 fill-current" /> : <Rocket className="w-4 h-4" />}
-                                </button>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Right: Live Preview */}
-                {snapshot && (
-                    <div className="w-[45%] border-l border-white/5 bg-black/50 backdrop-blur-sm p-4 flex flex-col gap-2 animate-in slide-in-from-right-10 fade-in duration-500">
-                        <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            LIVE PREVIEW
-                        </div>
-                        <div className="flex-1 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black relative">
-                            <img src={snapshot} className="w-full h-full object-contain" alt="Live Browser View" />
-                        </div>
-                    </div>
+                        {/* Live Preview */}
+                        {snapshot && (
+                            <div className="w-[45%] border-l border-white/5 bg-black/50 backdrop-blur-sm p-4 flex flex-col gap-2 animate-in slide-in-from-right-10 fade-in duration-500">
+                                <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2">
+                                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                                    LIVE PREVIEW
+                                </div>
+                                <div className="flex-1 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black relative">
+                                    <img src={snapshot} className="w-full h-full object-contain" alt="Live Browser View" />
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                ) : (
+                    <HistoryView />
                 )}
-            </main>
-
-            <div className="h-6 border-t border-white/5 bg-black/40 backdrop-blur text-[9px] text-muted-foreground flex items-center px-4 gap-4">
-                <div className="flex items-center gap-2">
-                    <Activity className="w-3 h-3" />
-                    <span>STATUS: {status}</span>
-                </div>
             </div>
         </div>
     )
