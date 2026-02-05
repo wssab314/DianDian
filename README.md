@@ -128,14 +128,32 @@ npm run dev
 
 ---
 
+---
+
+## 🤖 Agent 核心实现 (Deep Dive)
+
+DianDian 的 Agent 并非简单的 OpenAI 套壳，而是基于 Playwright 最新底层能力构建的增强方案：
+
+-   **官方底层深度集成**: 我们深度利用了 Playwright 官方推出的 **Aria Snapshot (辅助功能树快照)** 技术。Agent 不会去解析混乱的 HTML 源码，而是直接理解经过渲染后的语义树（包括角色、名称、状态），极大提升了指令理解的准确率。
+-   **Qwen 驱动的推理引擎**: 针对国内环境優化，我们将 Aria Snapshot 喂给 **通义千问 (Qwen-Max)**，通过自研的 Prompt 策略实现比官方预览版更稳定的中文指令解析。
+-   **混合感知架构 (Hybrid Perception)**: 
+    -   **L1 (Text-First)**: 优先通过文本语义进行极速交互，降低延迟与 Token 成本。
+    -   **L2 (Vision-Fallback)**: 当文本无法描述对应元素（如 Canvas 或 无标签图标）时，自动触发视觉识别，利用 **SoM (Set-of-Mark)** 标记技术配合 Qwen-VL 实现精准定位。
+-   **全平台 Sidecar 架构**: 后端 Python 引擎被打包为 **Sidecar 二进制文件**，可随 Electron 应用直接分发，用户无需配置 Python 环境即可获得原生 Agent 执行能力。
+
+---
+
 ## 🗺️ 路线图 (Roadmap)
 
 - [x] **v1.0 MVP**: 纯视觉代理，基础对话功能。
 - [x] **v1.1 Stability (Current)**: 混合感知引擎，SQLite 持久化，移动端模拟，指点纠正。
-- [ ] **v1.2 Scalability**: 
+- [x] **v1.2 Packaging & CI/CD**: 
+    - [x] 全平台桌面化打包方案 (.exe / .dmg)。
+    - [x] 集成 GitHub Actions 自动化发布流水线。
+- [ ] **v1.3 Scalability**: 
     - [ ] 支持 Docker 容器化部署。
-    - [ ] 集成 CI/CD流水线 (GitHub Actions)。
-    - [ ] 支持更多 LLM 模型 (OpenAI, Claude)。
+    - [ ] 支持更多主流 LLM 模型 (DeepSeek, Claude)。
+    - [ ] 导出 Playwright Pytest/Vitest 脚本。
 
 ---
 
