@@ -49,3 +49,7 @@ blob-report/
 /dian_engine/
 *.log
 engine/data.db
+dist-engine/
+*.spec
+diandian.db
+reports/

@@ -1,16 +1,1 @@
-"use strict";
-const electron = require("electron");
-electron.contextBridge.exposeInMainWorld("electronAPI", {
-  minimize: () => electron.ipcRenderer.send("window-minimize"),
-  maximize: () => electron.ipcRenderer.send("window-maximize"),
-  close: () => electron.ipcRenderer.send("window-close")
-});
-window.addEventListener("DOMContentLoaded", () => {
-  const replaceText = (selector, text) => {
-    const element = document.getElementById(selector);
-    if (element) element.innerText = text;
-  };
-  for (const type of ["chrome", "node", "electron"]) {
-    replaceText(`${type}-version`, process.versions[type] || "");
-  }
-});
+"use strict";const n=require("electron");n.contextBridge.exposeInMainWorld("electronAPI",{minimize:()=>n.ipcRenderer.send("window-minimize"),maximize:()=>n.ipcRenderer.send("window-maximize"),close:()=>n.ipcRenderer.send("window-close")});window.addEventListener("DOMContentLoaded",()=>{const o=(e,r)=>{const i=document.getElementById(e);i&&(i.innerText=r)};for(const e of["chrome","node","electron"])o(`${e}-version`,process.versions[e]||"")});

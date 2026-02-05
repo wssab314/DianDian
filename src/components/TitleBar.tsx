@@ -1,4 +1,3 @@
-import React from 'react'
 import { Minus, Square, X, Sparkles } from 'lucide-react'
 
 const TitleBar = () => {

@@ -7,22 +7,40 @@ process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.
 
 let win: BrowserWindow | null
 // ⚠️ 实际发布时，可能需要指向打包后的 exe；开发模式下直接调用 python 
-const PYTHON_SCRIPT_PATH = path.join(__dirname, '../engine/server.py')
 let pythonProcess: ChildProcess | null = null
 
+function getEnginePath() {
+    if (app.isPackaged) {
+        // In packaged app, engine is in resources folder
+        const exeName = process.platform === 'win32' ? 'diandian-engine.exe' : 'diandian-engine'
+        return path.join(process.resourcesPath, 'bin', exeName)
+    }
+    // In dev, use python directly
+    return path.join(__dirname, '../engine/server.py')
+}
+
 function startPythonEngine() {
-    console.log('Starting Python Engine from:', PYTHON_SCRIPT_PATH)
+    const enginePath = getEnginePath()
+    console.log('Starting Python Engine from:', enginePath)
 
-    // 假设用户环境已有 python3 或者 python
-    // 在 Windows 上可能是 'python'，Mac/Linux 可能是 'python3'
-    // 简单起见，这里先尝试 'python'，失败则尝试 'python3'
-    // 更好的做法是检查环境，或者让用户配置
-    const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3'
-
-    pythonProcess = spawn(pythonExecutable, [PYTHON_SCRIPT_PATH], {
-        cwd: path.dirname(PYTHON_SCRIPT_PATH),
-        stdio: ['ignore', 'pipe', 'pipe'] // Listen to stdout/stderr
-    })
+    if (app.isPackaged) {
+        // Run the bundled executable
+        pythonProcess = spawn(enginePath, [], {
+            cwd: path.dirname(enginePath),
+            stdio: ['ignore', 'pipe', 'pipe']
+        })
+    } else {
+        // Dev mode: Run via python interpreter
+        // 假设用户环境已有 python3 或者 python
+        // 在 Windows 上可能是 'python'，Mac/Linux 可能是 'python3'
+        // 简单起见，这里先尝试 'python'，失败则尝试 'python3'
+        // 更好的做法是检查环境，或者让用户配置
+        const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3'
+        pythonProcess = spawn(pythonExecutable, [enginePath], {
+            cwd: path.dirname(enginePath),
+            stdio: ['ignore', 'pipe', 'pipe']
+        })
+    }
 
     if (pythonProcess.stdout) {
         pythonProcess.stdout.on('data', (data) => {

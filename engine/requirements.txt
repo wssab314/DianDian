@@ -4,3 +4,5 @@ python-socketio
 playwright
 dashscope
 python-dotenv
+sqlmodel
+pyinstaller
