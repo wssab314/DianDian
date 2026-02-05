@@ -1,6 +1,7 @@
 import socketio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import sys
 import asyncio
@@ -9,10 +10,20 @@ from agent.core import DiandianAgent
 from database import create_db_and_tables, TestCase, get_session, engine
 from sqlmodel import Session, select
 import os
+from datetime import datetime
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 app = FastAPI()
+
+# Enable CORS for HTTP requests (needed for fetch /api/reports from localhost:5173)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For dev, allow all. Prod: ["http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount Reports Directory
 REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports")
@@ -34,6 +45,35 @@ agent = DiandianAgent()
 @app.get("/")
 def read_root():
     return {"message": "DianDian Python Engine is Running"}
+
+@app.get("/api/reports")
+def get_reports():
+    """List all generated reports."""
+    reports = []
+    if os.path.exists(REPORTS_DIR):
+        # List subdirectories (each report is a folder)
+        for item in os.listdir(REPORTS_DIR):
+            item_path = os.path.join(REPORTS_DIR, item)
+            if os.path.isdir(item_path):
+                # Try to find an index.html or just link the folder
+                # Our report format: task_id_timestamp/
+                try:
+                    # Simple parsing: assume folder name has timestamp or just use creating time
+                    timestamp = os.path.getctime(item_path)
+                    date_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+                    reports.append({
+                        "id": item,
+                        "date": date_str,
+                        "path": f"/reports/{item}/index.html" # Assuming index.html exists
+                    })
+                except Exception as e:
+                    print(f"Error parsing report {item}: {e}")
+    
+    # Sort by date desc
+    reports.sort(key=lambda x: x['date'], reverse=True)
+    return {"reports": reports}
+
+# ... rest of the file (Task Management, Socket Events, etc) ...
 
 # Task Management
 current_task = None

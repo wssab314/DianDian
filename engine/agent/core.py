@@ -80,8 +80,11 @@ class DiandianAgent:
                     param = action_data.get("param")
                     thought = action_data.get("thought", "")
 
+                    param_str = f" {param}" if param is not None else ""
+                    target_str = f" #{target_id}" if target_id is not None else ""
+                    
                     if emit_func:
-                        await emit_func('agent_thought', {'step': 'action', 'detail': f'{thought} -> {action} {param}'})
+                        await emit_func('agent_thought', {'step': 'action', 'detail': f'{thought} -> {action}{target_str}{param_str}'})
 
                     success = False
                     if action == "navigate":

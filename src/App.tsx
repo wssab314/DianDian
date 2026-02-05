@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import io, { Socket } from 'socket.io-client'
-import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square, History, LayoutGrid } from 'lucide-react'
+import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square, History, LayoutGrid, Book, Save } from 'lucide-react'
 import HistoryView from './components/HistoryView'
+import LibraryView from './components/LibraryView'
 
 // Types
 interface AgentThought {
@@ -91,7 +92,7 @@ function App() {
     const [messages, setMessages] = useState<Message[]>([])
     const [snapshot, setSnapshot] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
-    const [currentView, setCurrentView] = useState<'agent' | 'history'>('agent')
+    const [currentView, setCurrentView] = useState<'agent' | 'history' | 'library'>('agent')
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -170,6 +171,11 @@ function App() {
             console.log("Report generated!")
         })
 
+        // Listen for save case success
+        newSocket.on('save_case_success', (data: { name: string }) => {
+            alert(`Case "${data.name}" saved successfully!`)
+        })
+
         return () => {
             newSocket.disconnect()
         }
@@ -225,6 +231,39 @@ function App() {
         }
     }
 
+    // Save Case Logic
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
+    const [saveName, setSaveName] = useState('')
+    const [saveDescription, setSaveDescription] = useState('')
+
+    const openSaveModal = () => {
+        // Filter user prompts to check if there's anything to save
+        const prompts = messages.filter(m => m.role === 'user')
+        if (prompts.length === 0) {
+            alert("No actions to save!")
+            return
+        }
+        setIsSaveModalOpen(true)
+    }
+
+    const confirmSaveCase = () => {
+        if (!socket || !saveName.trim()) return
+
+        const prompts = messages
+            .filter(m => m.role === 'user')
+            .map(m => m.content)
+
+        socket.emit('save_case', {
+            name: saveName,
+            description: saveDescription,
+            prompts
+        })
+
+        setIsSaveModalOpen(false)
+        setSaveName('')
+        setSaveDescription('')
+    }
+
     return (
         <div className="min-h-screen bg-background text-foreground flex font-sans selection:bg-primary/30">
             {/* Sidebar Navigation */}
@@ -242,6 +281,13 @@ function App() {
                         <span className="text-[10px] font-medium">Agent</span>
                     </button>
                     <button
+                        onClick={() => setCurrentView('library')}
+                        className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'library' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
+                    >
+                        <Book className="w-5 h-5" />
+                        <span className="text-[10px] font-medium">Library</span>
+                    </button>
+                    <button
                         onClick={() => setCurrentView('history')}
                         className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all ${currentView === 'history' ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5'}`}
                     >
@@ -256,11 +302,12 @@ function App() {
             </aside>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-screen overflow-hidden">
+            <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
                 {currentView === 'agent' ? (
                     <main className="flex-1 flex overflow-hidden">
                         {/* Chat Area */}
                         <div className={`flex-1 flex flex-col relative z-10 w-full transition-all duration-500`}>
+
                             {/* Messages List */}
                             <div className="flex-1 overflow-y-auto p-6 space-y-2 scrollbar-hide">
                                 {messages.length === 0 ? (
@@ -276,9 +323,22 @@ function App() {
 
                             {/* Input Area */}
                             <div className="p-4 bg-background/50 backdrop-blur-sm border-t border-white/5">
-                                <div className="relative group max-w-3xl mx-auto">
-                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/50 to-blue-500/50 rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-500"></div>
-                                    <div className="relative bg-card border border-white/10 rounded-2xl p-2 flex items-center shadow-2xl">
+                                <div className="relative group max-w-3xl mx-auto flex items-center gap-3">
+
+                                    {/* Save Button (Left of Input) */}
+                                    {messages.length > 0 && (
+                                        <button
+                                            onClick={openSaveModal}
+                                            className="p-3 rounded-2xl bg-card border border-white/10 text-muted-foreground hover:text-white hover:border-primary/50 transition-all shadow-md group/save relative overflow-hidden"
+                                            title="Save as Case"
+                                        >
+                                            <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover/save:opacity-100 transition-opacity" />
+                                            <Save className="w-5 h-5 relative z-10" />
+                                        </button>
+                                    )}
+
+                                    <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/50 to-blue-500/50 rounded-2xl blur opacity-30 group-hover:opacity-75 transition duration-500 left-12 right-0"></div>
+                                    <div className="relative flex-1 bg-card border border-white/10 rounded-2xl p-2 flex items-center shadow-2xl">
                                         <div className="pl-4 pr-3 text-muted-foreground">
                                             <Terminal className="w-6 h-6" />
                                         </div>
@@ -319,8 +379,62 @@ function App() {
                             </div>
                         )}
                     </main>
+                ) : currentView === 'library' ? (
+                    <LibraryView socket={socket} connected={connected} />
                 ) : (
                     <HistoryView />
+                )}
+
+                {/* Save Case Modal */}
+                {isSaveModalOpen && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-card w-full max-w-md border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                            <div className="p-6 border-b border-white/5">
+                                <h3 className="text-xl font-light text-white flex items-center gap-2">
+                                    <Save className="w-5 h-5 text-primary" />
+                                    Save Test Case
+                                </h3>
+                                <p className="text-sm text-muted-foreground mt-1">Save this conversation flow as a reusable test case.</p>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Case Name</label>
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30"
+                                        placeholder="e.g., Verify Login Flow"
+                                        value={saveName}
+                                        onChange={e => setSaveName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Description (Optional)</label>
+                                    <textarea
+                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-primary/50 transition-all placeholder:text-muted-foreground/30 min-h-[80px]"
+                                        placeholder="Describe what this test does..."
+                                        value={saveDescription}
+                                        onChange={e => setSaveDescription(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="p-4 bg-muted/20 flex gap-3 justify-end border-t border-white/5">
+                                <button
+                                    onClick={() => setIsSaveModalOpen(false)}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-white/5 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmSaveCase}
+                                    disabled={!saveName.trim()}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Save Case
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </div>
