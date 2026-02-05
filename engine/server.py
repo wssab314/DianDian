@@ -1,11 +1,14 @@
 import socketio
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 import sys
 import asyncio
 from browser.driver import BrowserController
 from agent.core import DiandianAgent
-from database import create_db_and_tables
+from database import create_db_and_tables, TestCase, get_session, engine
+from sqlmodel import Session, select
+import os
 
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
@@ -95,6 +98,103 @@ async def stop(sid, data):
         await sio.emit('response', {'data': "Stopping agent..."}, room=sid)
     else:
          await sio.emit('response', {'data': "No active task to stop."}, room=sid)
+
+# --- Case Management API (v1.1) ---
+
+@sio.event
+async def save_case(sid, data):
+    """
+    Save current conversation/task as a Test Case.
+    data: { name: str, prompts: List[str], description: str }
+    """
+    print(f"Saving case: {data}")
+    try:
+        case = TestCase(
+            name=data.get("name"),
+            description=data.get("description", ""),
+            prompts=data.get("prompts", []),
+            config=data.get("config", {})
+        )
+        with Session(engine) as session:
+            session.add(case)
+            session.commit()
+            session.refresh(case)
+        
+        await sio.emit('save_case_success', {'id': case.id, 'name': case.name}, room=sid)
+    except Exception as e:
+        print(f"Save Case Error: {e}")
+        await sio.emit('error', {'message': f"Failed to save case: {str(e)}"}, room=sid)
+
+@sio.event
+async def load_cases(sid, data):
+    """List all saved test cases."""
+    try:
+        with Session(engine) as session:
+            statement = select(TestCase).order_by(TestCase.created_at.desc())
+            results = session.exec(statement).all()
+            # Serialize
+            cases = [c.model_dump() for c in results]
+            
+            # Helper for datetime serialization if needed, but model_dump usually handles it well or returns datetime obj
+            # We might need to convert datetime to str for json
+            for c in cases:
+                if c.get('created_at'):
+                   c['created_at'] = c['created_at'].isoformat()
+
+        await sio.emit('cases_list', cases, room=sid)
+    except Exception as e:
+        print(f"Load Cases Error: {e}")
+        await sio.emit('error', {'message': f"Failed to load cases: {str(e)}"}, room=sid)
+
+@sio.event
+async def replay_case(sid, data):
+    """
+    Replay a specific test case by ID.
+    data: { case_id: int }
+    """
+    global current_task
+    case_id = data.get("case_id")
+    print(f"Replaying Case ID: {case_id}")
+    
+    if current_task and not current_task.done():
+        await sio.emit('error', {'message': "Agent is busy."}, room=sid)
+        return
+
+    # Fetch Case
+    case = None
+    with Session(engine) as session:
+        case = session.get(TestCase, case_id)
+    
+    if not case:
+        await sio.emit('error', {'message': "Case not found."}, room=sid)
+        return
+
+    # Logic to replay prompts sequentially
+    # For MVP v1.1, we just chain them? Or feed one by one?
+    # Ideally, we create a wrapper task that executes them sequentially.
+    
+    async def emit_to_client(event, payload):
+        await sio.emit(event, payload, room=sid)
+
+    async def execute_replay_flow(prompts, sid):
+        global current_task
+        try:
+             await sio.emit('processing_state', {'status': 'running', 'mode': 'replay'}, room=sid)
+             for prompt in prompts:
+                 print(f"Replay Step: {prompt}")
+                 await sio.emit('replay_step_start', {'prompt': prompt}, room=sid)
+                 await agent.process_command(prompt, emit_func=emit_to_client)
+                 await asyncio.sleep(1) # Breath
+             
+             await sio.emit('response', {'data': "✅ Replay Completed successfully."}, room=sid)
+        except Exception as e:
+             print(f"Replay Error: {e}")
+             await sio.emit('response', {'data': f"Replay Failed: {str(e)}"}, room=sid)
+        finally:
+             current_task = None
+             await sio.emit('processing_state', {'status': 'idle'}, room=sid)
+
+    current_task = asyncio.create_task(execute_replay_flow(case.prompts, sid))
 
 
 # --- Browser Control Events (Legacy/Direct) ---
