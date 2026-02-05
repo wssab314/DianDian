@@ -13,6 +13,7 @@ Thumbs.db
 # Node.js / Electron
 node_modules/
 dist/
+dist-electron/
 build/
 release/
 .env
@@ -34,20 +35,17 @@ env/
 .pytest_cache/
 .coverage
 htmlcov/
+site/
 
-# PyInstaller
-*.manifest
-*.spec
-build/
-dist/
-
-# Playwright
+# Test Artifacts
+.agent/
+engine/reports/
 test-results/
 playwright-report/
 blob-report/
 
 # DianDian Specific
 /resources/extra/
-/config.json
 /dian_engine/
 *.log
+engine/data.db

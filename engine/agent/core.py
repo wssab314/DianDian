@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 from browser.driver import BrowserController
 from agent.planner import QwenPlanner
 from agent.executor import HybridExecutor
@@ -7,6 +8,7 @@ from agent.som import SetOfMark
 from reporter import Reporter
 
 class DiandianAgent:
+
     def __init__(self):
         self.planner = QwenPlanner()
         self.executor = HybridExecutor()
@@ -14,6 +16,16 @@ class DiandianAgent:
         self.som = SetOfMark(None)
         self.history = []
         self.reporter = None # initialized per task
+        
+        # Load Environment Config
+        self.env_config = {
+            "BASE_URL": os.getenv("BASE_URL", "https://www.google.com"),
+            "ENV_NAME": os.getenv("ENV_NAME", "Production")
+        }
+
+    def update_env_config(self, key: str, value: str):
+        self.env_config[key] = value
+        print(f"[Agent] Updated Env Config: {key}={value}")
 
     async def handle_interaction(self, x: float, y: float):
         """
@@ -84,8 +96,21 @@ class DiandianAgent:
         return None
 
     async def process_command(self, user_input: str, emit_func=None):
-        # ... (rest of the method method)
-        print(f"\n[Agent] Processing: {user_input}")
+        """
+        Orchestrate the agent loop: Plan -> Execute -> Report
+        """
+        if user_input == "/start":
+            # Just start browser
+            await self.browser.start()
+            return
+
+        # Inject Environment Context
+        base_url = self.env_config.get("BASE_URL", "")
+        env_name = self.env_config.get("ENV_NAME", "Unknown")
+        
+        context_prompt = f"{user_input}\n\n[System Context] Current Environment: {env_name}. Base URL: {base_url}. If the user implies starting from scratch or 'open', start at {base_url}."
+        
+        print(f"\n[Agent] Processing: {user_input} (Env: {env_name})")
         self.history = [] # Reset history for new task
         self.reporter = Reporter()
         self.reporter.set_task(user_input)
@@ -98,7 +123,7 @@ class DiandianAgent:
         if emit_func:
             await emit_func('agent_thought', {'step': 'planning', 'detail': 'Analyzing request...'})
         
-        plan = await self.planner.plan_task(user_input)
+        plan = await self.planner.plan_task(context_prompt)
         steps = plan.get("steps", [])
         
         if emit_func:
@@ -138,9 +163,15 @@ class DiandianAgent:
                     
                     if not screenshot:
                          print("[Agent] Failed to capture screenshot. Retrying...")
+                         # Try to start browser if it might have crashed or not started
+                         if not self.browser.page:
+                             print("[Agent] Browser page is None. Restarting browser...")
+                             await self.browser.start()
+                         
                          if attempt < max_retries - 1:
                              continue
                          else:
+                             print("[Agent] Max retries reached for screenshot. Skipping step.")
                              break
 
                     if emit_func and screenshot:
@@ -168,8 +199,13 @@ class DiandianAgent:
                     target_str = f" #{target_id}" if target_id is not None else ""
                     selector_str = f" [{selector}]" if selector else ""
                     
+
                     if emit_func:
-                        await emit_func('agent_thought', {'step': 'action', 'detail': f'{thought} -> {action}{target_str}{selector_str}{param_str} ({strategy})'})
+                        await emit_func('agent_thought', {
+                            'step': 'action', 
+                            'detail': f'{thought} -> {action}{target_str}{selector_str}{param_str}',
+                            'strategy': strategy
+                        })
 
                     success = False
                     if action == "navigate":

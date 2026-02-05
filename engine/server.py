@@ -12,9 +12,19 @@ from sqlmodel import Session, select
 import os
 from datetime import datetime
 
+# Initialize DB with lifespan
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    create_db_and_tables()
+    yield
+    # Shutdown (if needed)
+
 # Create a Socket.IO server
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Enable CORS for HTTP requests (needed for fetch /api/reports from localhost:5173)
 app.add_middleware(
@@ -31,10 +41,7 @@ if not os.path.exists(REPORTS_DIR):
     os.makedirs(REPORTS_DIR)
 app.mount("/reports", StaticFiles(directory=REPORTS_DIR), name="reports")
 
-# Initialize DB
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
+
 
 # Wrap with ASGI application
 socket_app = socketio.ASGIApp(sio, app)
@@ -248,6 +255,30 @@ async def replay_case(sid, data):
              await sio.emit('processing_state', {'status': 'idle'}, room=sid)
 
     current_task = asyncio.create_task(execute_replay_flow(case.prompts, sid))
+
+
+
+@sio.event
+async def update_config(sid, data):
+    """
+    Update browser configuration (e.g. device emulation).
+    data: { preset: str }
+    """
+    preset = data.get("preset", "desktop")
+    print(f"Updating config to: {preset}")
+    # Restart browser with new config
+    # We might need to ensure no task is running, or just force it.
+    # For now, we assume user does this when idle.
+    await agent.browser.restart_with_config(preset)
+    await sio.emit('config_updated', {'preset': preset}, room=sid)
+
+@sio.event
+async def update_env_config(sid, data):
+    key = data.get("key")
+    value = data.get("value")
+    if key and value:
+        agent.update_env_config(key, value)
+        await sio.emit('env_config_updated', agent.env_config, room=sid)
 
 
 # --- Browser Control Events (Legacy/Direct) ---

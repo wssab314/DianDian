@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react'
 import io, { Socket } from 'socket.io-client'
-import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square, History, LayoutGrid, Book, Save } from 'lucide-react'
+import { Sparkles, Terminal, Rocket, Activity, Bot, User, BrainCircuit, Square, History, LayoutGrid, Book, Save, Settings } from 'lucide-react'
 import HistoryView from './components/HistoryView'
 import LibraryView from './components/LibraryView'
+import DeviceSelector, { DEVICE_PRESETS } from './components/DeviceSelector'
+import SettingsModal from './components/SettingsModal'
 
 // Types
 interface AgentThought {
     step: 'planning' | 'executing' | 'action'
     detail: string
+    strategy?: 'text' | 'vision'
 }
 
 interface Message {
@@ -61,14 +64,25 @@ const MessageItem = ({ msg }: { msg: Message }) => {
                             <span className="uppercase tracking-widest text-[10px] font-bold">思考过程 (Reasoning)</span>
                         </div>
                         {msg.thoughts.map((thought, idx) => (
-                            <div key={idx} className="flex gap-2 items-start opacity-80 pl-2 border-l border-white/10">
+                            <div key={idx} className="flex gap-2 items-center opacity-80 pl-2 border-l border-white/10">
                                 <span className={`shrink-0 uppercase text-[9px] px-1 rounded ${thought.step === 'planning' ? 'bg-blue-500/20 text-blue-400' :
                                     thought.step === 'action' ? 'bg-orange-500/20 text-orange-400' :
                                         'bg-gray-500/20 text-gray-400'
                                     }`}>
                                     {thought.step}
                                 </span>
-                                <span>{thought.detail}</span>
+                                <span className="flex-1 truncate">{thought.detail}</span>
+                                {thought.strategy && (
+                                    <span
+                                        className={`ml-2 text-[10px] px-1 rounded border ${thought.strategy === 'text'
+                                            ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-500'
+                                            : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'
+                                            }`}
+                                        title={thought.strategy === 'text' ? 'L1: Text Analysis' : 'L2: Vision Analysis'}
+                                    >
+                                        {thought.strategy === 'text' ? '⚡️ DOM' : '👁️ Vision'}
+                                    </span>
+                                )}
                             </div>
                         ))}
                         {msg.isThinking && (
@@ -86,7 +100,6 @@ const MessageItem = ({ msg }: { msg: Message }) => {
 }
 
 function App() {
-    // ... (hooks remain same)
     const [status, setStatus] = useState('初始化中...')
     const [connected, setConnected] = useState(false)
     const [socket, setSocket] = useState<Socket | null>(null)
@@ -95,6 +108,8 @@ function App() {
     const [snapshot, setSnapshot] = useState<string | null>(null)
     const [isProcessing, setIsProcessing] = useState(false)
     const [currentView, setCurrentView] = useState<'agent' | 'history' | 'library'>('agent')
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+    const [currentPreset, setCurrentPreset] = useState('desktop')
 
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -129,7 +144,54 @@ function App() {
             setIsProcessing(false)
         })
 
-        // ... (other socket events remain same)
+        newSocket.on('config_updated', (data: { preset: string }) => {
+            console.log(`Config updated to ${data.preset}`)
+            // Optional: Toast notification
+        })
+
+        newSocket.on('processing_state', (data: { status: 'running' | 'idle' }) => {
+            setIsProcessing(data.status === 'running')
+        })
+
+        newSocket.on('response', (payload: { data: string }) => {
+            addAgentMessage(payload.data)
+        })
+
+        newSocket.on('agent_thought', (thought: AgentThought) => {
+            setMessages(prev => {
+                const last = prev[prev.length - 1]
+                if (last && last.role === 'assistant' && last.isThinking) {
+                    return [
+                        ...prev.slice(0, -1),
+                        {
+                            ...last,
+                            thoughts: [...(last.thoughts || []), thought],
+                        }
+                    ]
+                } else {
+                    return [
+                        ...prev,
+                        {
+                            id: crypto.randomUUID(),
+                            role: 'assistant',
+                            content: '',
+                            thoughts: [thought],
+                            isThinking: true,
+                            check_thoughts: true
+                        }
+                    ]
+                }
+            })
+        })
+
+        newSocket.on('browser_snapshot', (data: { image: string }) => {
+            setSnapshot(`data:image/jpeg;base64,${data.image}`)
+        })
+
+        newSocket.on('report_generated', () => {
+            // Optional: Show toast notification
+            console.log("Report generated!")
+        })
 
         // Listen for save case success
         newSocket.on('save_case_success', (data: { name: string }) => {
@@ -141,13 +203,66 @@ function App() {
         }
     }, [])
 
-    // ... (helper functions remain same)
+    const addAgentMessage = (text: string) => {
+        setMessages(prev => {
+            const last = prev[prev.length - 1]
+            if (last && last.role === 'assistant' && last.isThinking) {
+                return [
+                    ...prev.slice(0, -1),
+                    {
+                        ...last,
+                        content: text,
+                        isThinking: false
+                    }
+                ]
+            } else {
+                return [...prev, { id: crypto.randomUUID(), role: 'assistant', content: text }]
+            }
+        })
+    }
 
     const handleStop = () => {
         if (!socket) return
         socket.emit('stop', {})
         addAgentMessage("🛑 正在停止...")
     }
+
+    const handleSend = () => {
+        if (!socket || !connected || !query.trim()) return
+
+        const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: query, check_thoughts: false }
+        const agentPlaceholder: Message = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            thoughts: [],
+            isThinking: true,
+            check_thoughts: true
+        }
+
+        setMessages(prev => [...prev, userMsg, agentPlaceholder])
+        socket.emit('message', { data: query })
+        setQuery('')
+    }
+
+    const handleAction = () => {
+        if (isProcessing) {
+            handleStop()
+        } else {
+            handleSend()
+        }
+    }
+
+    const handlePresetChange = (preset: string) => {
+        if (!socket) return
+        setCurrentPreset(preset)
+        socket.emit('update_config', { preset })
+    }
+
+    // Save Case Logic
+    const [isSaveModalOpen, setIsSaveModalOpen] = useState(false)
+    const [saveName, setSaveName] = useState('')
+    const [saveDescription, setSaveDescription] = useState('')
 
     const openSaveModal = () => {
         // Filter user prompts to check if there's anything to save
@@ -159,7 +274,27 @@ function App() {
         setIsSaveModalOpen(true)
     }
 
-    // ... (return JSX)
+    const confirmSaveCase = () => {
+        if (!socket || !saveName.trim()) return
+
+        const prompts = messages
+            .filter(m => m.role === 'user')
+            .map(m => m.content)
+
+        socket.emit('save_case', {
+            name: saveName,
+            description: saveDescription,
+            prompts
+        })
+
+        setIsSaveModalOpen(false)
+        setSaveName('')
+        setSaveDescription('')
+    }
+
+    // Get aspect ratio for current preset
+    const activePreset = DEVICE_PRESETS.find(p => p.id === currentPreset) || DEVICE_PRESETS[0]
+    const aspectRatio = activePreset.width / activePreset.height
 
     return (
         <div className="min-h-screen bg-background text-foreground flex font-sans selection:bg-primary/30">
@@ -190,6 +325,13 @@ function App() {
                     >
                         <History className="w-5 h-5" />
                         <span className="text-[10px] font-medium">历史</span>
+                    </button>
+                    <button
+                        onClick={() => setIsSettingsOpen(true)}
+                        className={`p-3 rounded-xl flex flex-col items-center gap-1 transition-all text-muted-foreground hover:bg-white/5 hover:text-white`}
+                    >
+                        <Settings className="w-5 h-5" />
+                        <span className="text-[10px] font-medium">设置</span>
                     </button>
                 </nav>
 
@@ -264,40 +406,55 @@ function App() {
                         </div>
 
                         {/* Live Preview */}
-                        {snapshot && (
+                        {snapshot ? (
                             <div className="w-[45%] border-l border-white/5 bg-black/50 backdrop-blur-sm p-4 flex flex-col gap-2 animate-in slide-in-from-right-10 fade-in duration-500">
                                 <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground mb-2 justify-between">
                                     <div className="flex items-center gap-2">
                                         <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                                         实时预览 (点击画面以教学)
                                     </div>
-                                    <div className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-white/50">
-                                        点选教学已激活
+                                    <div className="flex items-center gap-2">
+                                        <DeviceSelector
+                                            currentPreset={currentPreset}
+                                            onSelect={handlePresetChange}
+                                            disabled={isProcessing}
+                                        />
                                     </div>
                                 </div>
-                                <div
-                                    className="flex-1 rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-black relative cursor-crosshair group"
-                                    onClick={(e) => {
-                                        if (!socket) return
-                                        const rect = e.currentTarget.getBoundingClientRect()
-                                        const x = (e.clientX - rect.left) / rect.width
-                                        const y = (e.clientY - rect.top) / rect.height
 
-                                        // Visual feedback
-                                        const ripple = document.createElement('div')
-                                        ripple.className = 'absolute w-4 h-4 bg-primary/50 rounded-full animate-ping pointer-events-none'
-                                        ripple.style.left = `${e.clientX - rect.left - 8}px`
-                                        ripple.style.top = `${e.clientY - rect.top - 8}px`
-                                        e.currentTarget.appendChild(ripple)
-                                        setTimeout(() => ripple.remove(), 1000)
+                                {/* Centered Container for Aspect Ratio */}
+                                <div className="flex-1 flex items-center justify-center p-4 bg-black/20 rounded-xl overflow-hidden border border-white/5 relative">
+                                    <div
+                                        className="relative shadow-2xl bg-black cursor-crosshair group transition-all duration-300"
+                                        style={{
+                                            aspectRatio: `${aspectRatio}`,
+                                            maxHeight: '100%',
+                                            maxWidth: '100%'
+                                        }}
+                                        onClick={(e) => {
+                                            if (!socket) return
+                                            const rect = e.currentTarget.getBoundingClientRect()
+                                            const x = (e.clientX - rect.left) / rect.width
+                                            const y = (e.clientY - rect.top) / rect.height
 
-                                        console.log(`Pointing at: ${x.toFixed(2)}, ${y.toFixed(2)}`)
-                                        socket.emit('interact', { x, y })
-                                    }}
-                                >
-                                    <img src={snapshot} className="w-full h-full object-contain pointer-events-none" alt="Live Browser View" />
+                                            // Visual feedback
+                                            const ripple = document.createElement('div')
+                                            ripple.className = 'absolute w-4 h-4 bg-primary/50 rounded-full animate-ping pointer-events-none'
+                                            ripple.style.left = `${e.clientX - rect.left - 8}px`
+                                            ripple.style.top = `${e.clientY - rect.top - 8}px`
+                                            e.currentTarget.appendChild(ripple)
+                                            setTimeout(() => ripple.remove(), 1000)
+
+                                            console.log(`Pointing at: ${x.toFixed(2)}, ${y.toFixed(2)}`)
+                                            socket.emit('interact', { x, y })
+                                        }}
+                                    >
+                                        <img src={snapshot} className="w-full h-full object-contain pointer-events-none" alt="Live Browser View" />
+                                    </div>
                                 </div>
                             </div>
+                        ) : (
+                            null
                         )}
                     </main>
                 ) : currentView === 'library' ? (
@@ -357,14 +514,15 @@ function App() {
                         </div>
                     </div>
                 )}
+
+                {/* Modals */}
+                <SettingsModal
+                    isOpen={isSettingsOpen}
+                    onClose={() => setIsSettingsOpen(false)}
+                    socket={socket}
+                />
             </div>
         </div>
-    )
-}
-
-export default App
-
-
     )
 }
 

@@ -10,7 +10,17 @@ from dashscope import MultiModalConversation
 from .base import PerceptionStrategy
 
 class VisionPerceptionStrategy(PerceptionStrategy):
-    # ... (init and _save_base64_to_temp same)
+    def __init__(self):
+        self.model = "qwen-vl-max"
+
+    def _save_base64_to_temp(self, base64_str):
+        # Decode base64 string to bytes
+        img_data = base64.b64decode(base64_str)
+        # Create a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+        temp_file.write(img_data)
+        temp_file.close()
+        return temp_file.name
 
     def _call_api(self, messages):
         return MultiModalConversation.call(
