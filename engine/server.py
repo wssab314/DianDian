@@ -80,7 +80,6 @@ def get_reports():
     reports.sort(key=lambda x: x['date'], reverse=True)
     return {"reports": reports}
 
-# ... rest of the file (Task Management, Socket Events, etc) ...
 
 # Task Management
 current_task = None

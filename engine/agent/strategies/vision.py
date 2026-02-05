@@ -45,7 +45,7 @@ class VisionPerceptionStrategy(PerceptionStrategy):
         1. **SoM定位**: 截图中的可交互元素已被【红色数字 ID】标记。你 **必须且只能** 操作这些有标记的元素。严禁臆造不存在的 ID。
         2. **场景自适应**: 
            - **弹窗**: 如果遇到遮挡视线的弹窗（如广告、登录提示、Cookie条），**优先** 寻找 ID 点击关闭或跳过，除非任务明确要求登录。
-           - **长页面**: 如果目标元素不在当前视野内（例如搜索结果在下方），请使用 `scroll` "down"。
+           - **长页面**: 如果目标元素不在当前视野内（例如搜索结果在下方），请使用 `scroll` "down" 或 "bottom"（如果目标在页尾）。
            - **完成态**: 如果页面内容已经完全满足【目标】，请立即返回 `done`。
         3. **输入规范**: 对于 `type` 操作，`param`必须是完整的输入内容。
 
@@ -57,7 +57,7 @@ class VisionPerceptionStrategy(PerceptionStrategy):
         # 动作空间 (Action Space)
         - `click`: 点击元素。需提供 `target_id`。
         - `type`: 输入文本。需提供 `target_id` 和 `param`(文本内容)。
-        - `scroll`: 滚动页面。`param` 为 "up" 或 "down"。无需 `target_id`。
+        - `scroll`: 滚动页面。`param` 为 "up", "down", "top" 或 "bottom"。无需 `target_id`。
         - `navigate`: 访问URL。`param`为网址。无需 `target_id`。
         - `back`: 浏览器后退。
         - `hover`: 鼠标悬停。需提供 `target_id`。

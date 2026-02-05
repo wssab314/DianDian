@@ -41,21 +41,34 @@ function createWindow() {
   win = new electron.BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false,
+    titleBarStyle: "hidden",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
-      nodeIntegration: true,
-      contextIsolation: false
-      // 简化 MVP 通信，生产环境建议开启
+      nodeIntegration: false,
+      // Changed for security
+      contextIsolation: true
+      // Changed for security
     }
   });
+  electron.ipcMain.on("window-minimize", () => win == null ? void 0 : win.minimize());
+  electron.ipcMain.on("window-maximize", () => {
+    if (win == null ? void 0 : win.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win == null ? void 0 : win.maximize();
+    }
+  });
+  electron.ipcMain.on("window-close", () => win == null ? void 0 : win.close());
   win.webContents.on("did-finish-load", () => {
     win == null ? void 0 : win.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
-  if (process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(process.env.VITE_DEV_SERVER_URL);
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
+  if (devServerUrl) {
+    win.loadURL(devServerUrl);
     win.webContents.openDevTools();
   } else {
-    win.loadFile(path.join(process.env.DIST, "index.html"));
+    win.loadFile(path.join(process.env.DIST || "", "index.html"));
   }
 }
 electron.app.on("window-all-closed", () => {

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { FileText, Clock, ExternalLink, Calendar } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { FileText, Clock, ExternalLink } from 'lucide-react';
 
 interface Report {
     id: string;

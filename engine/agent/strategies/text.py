@@ -7,7 +7,8 @@ import dashscope
 from .base import PerceptionStrategy
 
 class TextPerceptionStrategy(PerceptionStrategy):
-    # ... (init remains same)
+    def __init__(self):
+        self.model = "qwen-max"
 
     def _call_api(self, messages):
         return dashscope.Generation.call(
@@ -36,7 +37,7 @@ class TextPerceptionStrategy(PerceptionStrategy):
         # Action Space
         - `click`: Click an element. Provide `selector` (Playwright locator or Regex name).
         - `type`: Input text. Provide `selector` and `param` (text).
-        - `scroll`: "up" or "down".
+        - `scroll`: "up", "down", "top", or "bottom". Use "bottom" to quickly reach the end of the page.
         - `navigate`: "url"
         - `done`: Task completed.
         - `fail`: Cannot find element or unsure.

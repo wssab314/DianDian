@@ -10,16 +10,22 @@ class SetOfMark:
         css = """
         .som-marker {
             position: absolute;
-            background-color: #ff0000;
+            background-color: rgba(239, 68, 68, 0.8); /* Red-500 with 80% opacity */
             color: white;
-            font-size: 12px;
+            font-size: 10px;
             font-weight: bold;
-            padding: 2px 4px;
-            border-radius: 4px;
+            padding: 1px 3px;
+            border-radius: 3px;
             z-index: 2147483647;
             pointer-events: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            border: 1px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            transform: translate(-50%, -50%); /* Pin center to the coordinate */
+            line-height: 1;
+        }
+        .som-element-highlight {
+            outline: 1px solid rgba(239, 68, 68, 0.4) !important;
+            outline-offset: -1px !important;
         }
         """
         await self.page.add_style_tag(content=css)
@@ -32,8 +38,7 @@ class SetOfMark:
         await self.inject_style()
         
         # Identify interactive elements: buttons, inputs, links, textareas
-        # Simplified selector strategy
-        selector = "button, input, a, textarea, [role='button']"
+        selector = "button, input, a, textarea, [role='button'], [role='link']"
         elements = await self.page.query_selector_all(selector)
         
         self.marked_elements = {}
@@ -42,9 +47,13 @@ class SetOfMark:
             const rect = el.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0 || getComputedStyle(el).visibility === 'hidden') return false;
             
+            // Add subtle border to the element itself
+            el.classList.add('som-element-highlight');
+
             const marker = document.createElement('div');
             marker.className = 'som-marker';
             marker.textContent = id;
+            // Position at top-left corner
             marker.style.left = (rect.left + window.scrollX) + 'px';
             marker.style.top = (rect.top + window.scrollY) + 'px';
             document.body.appendChild(marker);
@@ -52,9 +61,10 @@ class SetOfMark:
         }
         """
 
-        # Cleanup old markers first
+        # Cleanup old markers and highlights first
         await self.page.evaluate("""() => {
             document.querySelectorAll('.som-marker').forEach(el => el.remove());
+            document.querySelectorAll('.som-element-highlight').forEach(el => el.classList.remove('som-element-highlight'));
         }""")
 
         visible_count = 0
@@ -85,5 +95,6 @@ class SetOfMark:
     async def clear_markers(self):
         await self.page.evaluate("""() => {
             document.querySelectorAll('.som-marker').forEach(el => el.remove());
+            document.querySelectorAll('.som-element-highlight').forEach(el => el.classList.remove('som-element-highlight'));
         }""")
         self.marked_elements = {}

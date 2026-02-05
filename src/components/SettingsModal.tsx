@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { X, Save, Globe, Server } from 'lucide-react'
+import { useState } from 'react'
+import { X, Globe, Server } from 'lucide-react'
 import { Socket } from 'socket.io-client'
 
 interface SettingsModalProps {

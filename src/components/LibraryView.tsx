@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
-import { Play, Calendar, FileJson, Trash2, Clock, CheckCircle2, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Play, FileJson, Clock } from 'lucide-react'
 import { Socket } from 'socket.io-client'
+import CaseDetailModal from './CaseDetailModal'
 
 interface TestCase {
     id: number
@@ -18,6 +19,7 @@ interface LibraryViewProps {
 export default function LibraryView({ socket, connected }: LibraryViewProps) {
     const [cases, setCases] = useState<TestCase[]>([])
     const [isLoading, setIsLoading] = useState(false)
+    const [selectedCase, setSelectedCase] = useState<TestCase | null>(null)
 
     useEffect(() => {
         if (!socket) return
@@ -41,7 +43,7 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
     }
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-black/20 text-slate-200">
+        <div className="flex-1 flex flex-col h-full bg-black/20 text-slate-200 overflow-hidden">
             {/* Header */}
             <header className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20 backdrop-blur-md">
                 <div>
@@ -57,7 +59,8 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                 {cases.map((testCase) => (
                     <div
                         key={testCase.id}
-                        className="group bg-card border border-white/5 hover:border-primary/50 rounded-xl p-5 transition-all hover:shadow-2xl hover:bg-white/[0.02] flex flex-col gap-4 relative overflow-hidden"
+                        onClick={() => setSelectedCase(testCase)}
+                        className="group bg-card border border-white/5 hover:border-primary/50 rounded-xl p-5 transition-all hover:shadow-2xl hover:bg-white/[0.02] flex flex-col gap-4 relative overflow-hidden cursor-pointer active:scale-[0.98]"
                     >
                         <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                             {/* Future: Delete button */}
@@ -98,9 +101,12 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                         </div>
 
                         <button
-                            onClick={() => handleReplay(testCase.id)}
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                handleReplay(testCase.id)
+                            }}
                             disabled={!connected}
-                            className="mt-2 w-full py-3 rounded-lg bg-white/5 hover:bg-primary hover:text-white border border-white/10 hover:border-transparent transition-all flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed group-hover:bg-primary/20 group-hover:text-primary"
+                            className="mt-2 w-full py-3 rounded-lg bg-white/5 hover:bg-primary hover:text-white border border-white/10 hover:border-transparent transition-all flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed group-hover:bg-primary/20 group-hover:text-primary z-10"
                         >
                             <Play className="w-4 h-4 fill-current" />
                             执行自动化
@@ -116,6 +122,15 @@ export default function LibraryView({ socket, connected }: LibraryViewProps) {
                     </div>
                 )}
             </div>
+
+            {/* Detail Modal */}
+            <CaseDetailModal
+                isOpen={!!selectedCase}
+                onClose={() => setSelectedCase(null)}
+                testCase={selectedCase}
+                onReplay={handleReplay}
+                connected={connected}
+            />
         </div>
     )
 }

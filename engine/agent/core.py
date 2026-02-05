@@ -136,9 +136,6 @@ class DiandianAgent:
         try:
             for i, step in enumerate(steps):
                 print(f"--- Executing Step {i+1}: {step} ---")
-                # ... (existing loop content) ...
-                # (Keep existing logic, just wrapping indentation)
-                
                 if emit_func:
                     await emit_func('agent_thought', {'step': 'executing', 'detail': f'Current Step: {step}'})
 
@@ -262,12 +259,16 @@ class DiandianAgent:
                                 print(f"[Agent] Type failed: {e}")
                     elif action == "scroll":
                         try:
-                            # param can be "up", "down", or None
-                            direction = param if param in ["up", "down"] else "down"
+                            # param can be "up", "down", "top", "bottom"
+                            direction = param if param in ["up", "down", "top", "bottom"] else "down"
                             if direction == "down":
-                                await self.browser.page.evaluate("window.scrollBy(0, 500)")
-                            else:
-                                await self.browser.page.evaluate("window.scrollBy(0, -500)")
+                                await self.browser.page.evaluate("window.scrollBy(0, 800)")
+                            elif direction == "up":
+                                await self.browser.page.evaluate("window.scrollBy(0, -800)")
+                            elif direction == "bottom":
+                                await self.browser.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                            elif direction == "top":
+                                await self.browser.page.evaluate("window.scrollTo(0, 0)")
                             success = True
                         except Exception as e:
                             print(f"[Agent] Scroll failed: {e}")

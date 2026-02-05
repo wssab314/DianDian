@@ -1,4 +1,3 @@
-import React from 'react'
 import { Monitor, Smartphone, Tablet } from 'lucide-react'
 
 interface DeviceSelectorProps {
@@ -37,8 +36,8 @@ export default function DeviceSelector({ currentPreset, onSelect, disabled }: De
                             key={preset.id}
                             onClick={() => onSelect(preset.id)}
                             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors ${currentPreset === preset.id
-                                    ? 'bg-primary/20 text-primary'
-                                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                                ? 'bg-primary/20 text-primary'
+                                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
                                 }`}
                         >
                             <preset.icon className="w-3.5 h-3.5" />
